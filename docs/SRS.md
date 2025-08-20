@@ -1,5 +1,3 @@
----
-
 # LandOfLearn — Software Requirements Specification (SRS) — MVP (v1.2)
 
 **Document:** LandOfLearn — Software Requirements Specification (Updated / Approved)
