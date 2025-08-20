@@ -2,7 +2,7 @@
 
 **Document:** LandOfLearn — Software Requirements Specification (Updated / Approved)
 **Version:** 1.2
-**Author:** Senior Full-Stack Software Engineer (Generated)
+**Author:** Mohammed Ali Alzamzami
 **Approval Date:** 2025-08-19
 
 ---
