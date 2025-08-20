@@ -1,0 +1,462 @@
+openapi: 3.0.3
+info:
+  title: LandOfLearn API (MVP)
+  version: "1.0.0"
+  description: |
+    API for LandOfLearn MVP — resource upload, review, browse, download.
+servers:
+  - url: http://landoflearn.local
+    description: Development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AuthRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token (expires in 15 minutes)
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+    Course:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        instructor_id: { type: integer }
+    Instructor:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+    Resource:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        type_id: { type: integer }
+        course_id: { type: integer }
+        instructor_id: { type: integer }
+        year: { type: integer }
+        status: { type: string, enum: [pending, approved, rejected, removed] }
+        downloads: { type: integer }
+        created_at: { type: string, format: date-time }
+    ResourcesList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resource'
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+            page: { type: integer }
+            per_page: { type: integer }
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Invalid or missing token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+security:
+  - {}
+
+paths:
+  /api/auth/login:
+    post:
+      summary: Login and receive access token + refresh cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: Login success
+          headers:
+            Set-Cookie:
+              description: HttpOnly refresh token cookie (landoflearn_refresh)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/refresh:
+    post:
+      summary: Exchange refresh cookie for new access token (refresh rotation)
+      description: Uses HttpOnly cookie `landoflearn_refresh`. Returns a new access token and sets rotated refresh cookie.
+      responses:
+        '200':
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/logout:
+    post:
+      summary: Logout and revoke refresh token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/courses:
+    get:
+      summary: List courses
+      responses:
+        '200':
+          description: Array of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Course'
+
+  /api/instructors:
+    get:
+      summary: List instructors
+      responses:
+        '200':
+          description: Array of instructors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Instructor'
+
+  /api/tags:
+    get:
+      summary: List tags (or search tags)
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Optional search
+      responses:
+        '200':
+          description: Tag list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: integer }
+                    name: { type: string }
+
+  /api/resources:
+    get:
+      summary: Browse / search approved resources
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: fulltext search on title & description
+        - in: query
+          name: course_id
+          schema: { type: integer }
+        - in: query
+          name: instructor_id
+          schema: { type: integer }
+        - in: query
+          name: type_id
+          schema: { type: integer }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Paginated resources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcesList'
+
+    post:
+      summary: Upload a new resource (students)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, title, course_id, type_id]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                description:
+                  type: string
+                course_id:
+                  type: integer
+                type_id:
+                  type: integer
+                instructor_id:
+                  type: integer
+                year:
+                  type: integer
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resource_id:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Payload too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: Unsupported Media Type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Duplicate resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/resources/{id}:
+    get:
+      summary: Get resource metadata
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+      responses:
+        '200':
+          description: Resource object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/resources/{id}/download:
+    get:
+      summary: Download file for approved resource
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: File stream (Content-Type varies)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Forbidden (not approved)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/admin/reviews/pending:
+    get:
+      summary: List pending resources for admin review
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Pending list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Resource'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/reviews/{id}/approve:
+    post:
+      summary: Approve pending resource
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/schemas/Error'
+
+  /api/admin/reviews/{id}/reject:
+    post:
+      summary: Reject pending resource
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /api/admin/analytics:
+    get:
+      summary: Basic admin analytics (pending, top downloads)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Analytics object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pending_count: { type: integer }
+                  top_downloads:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        resource_id: { type: integer }
+                        title: { type: string }
+                        downloads: { type: integer }
+
