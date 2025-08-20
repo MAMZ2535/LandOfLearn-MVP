@@ -2,7 +2,7 @@
 
 **Document:** LandOfLearn — Software Requirements Specification (Updated / Approved)
 **Version:** 1.2
-**Author:** Alzamzami Mohammed
+Author: Mohammed Al-Zamzami
 **Approval Date:** 2025-08-19
 
 ---
@@ -34,7 +34,7 @@
 
 ## 1. Executive Summary
 
-LandOfLearn (MVP) is a compact web application to centralize course-related educational resources (exams, notes, slides, projects, research) for the College of Information Technology & Computer Engineering (CITCE). The MVP focuses on essential features a single student can implement within the project deadline:
+LandOfLearn (MVP) is a compact web application to centralize course-related educational resources (exams, notes, slides, projects, research) for the College of Engineering and Computer (CEC). The MVP focuses on essential features a single student can implement within the project deadline:
 
 * JWT-based authentication (access token + refresh token rotation).
 * Student upload (file + metadata), file validation and checksum, admin single-step review (approve/reject).
